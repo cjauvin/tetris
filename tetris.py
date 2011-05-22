@@ -1,13 +1,17 @@
-# tetris.py
+# tetris.py -- A barebone (but readable) Pygame-based Tetris clone
 # Christian Jauvin <cjauvin@gmail.com>
-# Sometime in 2010
+# Created for fun, sometime in 2010.
+#
+# Do whatever you want with this code, but I would appreciate 
+# a mention of its origin.
 #
 
 import pygame, sys, time, random, copy
+from collections import namedtuple
 
-unit = 25 # cell: unit x unit
-unit_width = 10 # grid width in cells
-unit_height = 18 # grid height in cells
+unit = 25 # square cell: unit x unit pixels
+unit_width = 10 # grid width in # of cells
+unit_height = 18 # grid height in # of cells
 margin = unit
 size = width, height = (unit * unit_width) + (2 * margin), (unit * unit_height) + (2 * margin)
 grid_left = margin
@@ -17,17 +21,43 @@ grid_width = unit * unit_width
 drop_speed = 500 # in msecs
 move_speed = 200 # lateral
 
+Tetromino = namedtuple('Tetromino', ['states', 'color'])
+
+# See http://en.wikipedia.org/wiki/Tetromino
 tetrominoes = {
-    'I': {'grid': [[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0], [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0]], 'color': pygame.color.Color('red')},
-    'S': {'grid': [[0,0,0,0,0,0,1,0,0,1,1,0,0,1,0,0], [0,0,0,0,0,0,0,0,1,1,0,0,0,1,1,0]], 'color': pygame.color.Color('green')},
-    'Z': {'grid': [[0,0,0,0,1,0,0,0,1,1,0,0,0,1,0,0], [0,0,0,0,0,0,0,0,0,1,1,0,1,1,0,0]], 'color': pygame.color.Color('pink')},
-    'T': {'grid': [[0,1,0,0,1,1,1,0,0,0,0,0,0,0,0,0], [0,1,0,0,0,1,1,0,0,1,0,0,0,0,0,0], 
-                    [0,0,0,0,1,1,1,0,0,1,0,0,0,0,0,0], [0,1,0,0,1,1,0,0,0,1,0,0,0,0,0,0]], 'color': pygame.color.Color('blue')},
-    'O': {'grid': [[0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0]], 'color': pygame.color.Color('yellow')},
-    'L': {'grid': [[0,1,0,0,0,1,0,0,0,1,1,0,0,0,0,0], [0,0,0,0,1,1,1,0,1,0,0,0,0,0,0,0], 
-                   [1,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0], [0,0,1,0,1,1,1,0,0,0,0,0,0,0,0,0]], 'color': pygame.color.Color('turquoise')},
-    'J': {'grid': [[0,1,0,0,0,1,0,0,1,1,0,0,0,0,0,0], [1,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0], 
-                   [0,1,1,0,0,1,0,0,0,1,0,0,0,0,0,0], [0,0,0,0,1,1,1,0,0,0,1,0,0,0,0,0]], 'color': pygame.color.Color('cyan')}
+
+    'I': Tetromino(states=[[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],  
+                           [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0]], 
+                   color=pygame.color.Color('red')),
+
+    'S': Tetromino(states=[[0,0,0,0,0,0,1,0,0,1,1,0,0,1,0,0], 
+                           [0,0,0,0,0,0,0,0,1,1,0,0,0,1,1,0]], 
+                   color=pygame.color.Color('green')),
+
+    'Z': Tetromino(states=[[0,0,0,0,1,0,0,0,1,1,0,0,0,1,0,0], 
+                           [0,0,0,0,0,0,0,0,0,1,1,0,1,1,0,0]], 
+                   color=pygame.color.Color('pink')),
+
+    'T': Tetromino(states=[[0,1,0,0,1,1,1,0,0,0,0,0,0,0,0,0], 
+                           [0,1,0,0,0,1,1,0,0,1,0,0,0,0,0,0], 
+                           [0,0,0,0,1,1,1,0,0,1,0,0,0,0,0,0], 
+                           [0,1,0,0,1,1,0,0,0,1,0,0,0,0,0,0]], 
+                   color=pygame.color.Color('blue')),
+
+    'O': Tetromino(states=[[0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0]], 
+                   color=pygame.color.Color('yellow')),
+
+    'L': Tetromino(states=[[0,1,0,0,0,1,0,0,0,1,1,0,0,0,0,0], 
+                           [0,0,0,0,1,1,1,0,1,0,0,0,0,0,0,0], 
+                           [1,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0], 
+                           [0,0,1,0,1,1,1,0,0,0,0,0,0,0,0,0]], 
+                   color=pygame.color.Color('turquoise')),
+
+    'J': Tetromino(states=[[0,1,0,0,0,1,0,0,1,1,0,0,0,0,0,0], 
+                           [1,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0], 
+                           [0,1,1,0,0,1,0,0,0,1,0,0,0,0,0,0], 
+                           [0,0,0,0,1,1,1,0,0,0,1,0,0,0,0,0]], 
+                   color=pygame.color.Color('cyan'))
 }
 
 class Piece:
@@ -36,32 +66,34 @@ class Piece:
         self.reset()
 
     def draw(self):
-#        pygame.draw.rect(screen, pygame.color.Color('lightgrey'), (self.left, self.top, 4*unit, 4*unit), 1)
+        show_local_grid = False # set to True to see what's going on
         for i in range(4):
             for j in range(4):
                 k = (i * 4) + j
-                if tetrominoes[self.tetromino]['grid'][self.index][k]:
-                    pygame.draw.rect(screen, tetrominoes[self.tetromino]['color'], \
-                                         (self.left + (j * unit), self.top + (i * unit), unit, unit), 3)
+                if tetrominoes[self.tetromino].states[self.state][k]:
+                    pygame.draw.rect(screen, tetrominoes[self.tetromino].color,
+                                     (self.left + (j * unit), self.top + (i * unit), unit-2, unit-2), 3)
+                elif show_local_grid:
+                    pygame.draw.rect(screen, pygame.color.Color('lightgrey'), 
+                                     (self.left + (j * unit), self.top + (i * unit), unit, unit), 1)
 
     def reset(self):
-        global colors, color_idx
         self.left = margin + (grid_width / 2) - (2 * unit)
         self.top = margin - (2 * unit)
         self.tetromino = random.choice(tetrominoes.keys())
-        self.index = 0
+        self.state = 0
         
     def canGo(self, dir):
         if dir == 'down': return not self.isColliding(1, 0)
         elif dir == 'left': return not self.isColliding(0, -1)
         elif dir == 'right': return not self.isColliding(0, 1)
 
-    def isColliding(self, gi_disp, gj_disp, index = None):
+    def isColliding(self, gi_disp, gj_disp, state = None):
         gi, gj = self.getGridCoords()
         for i in range(4):
             for j in range(4):
                 k = (i * 4) + j
-                if tetrominoes[self.tetromino]['grid'][index if index is not None else self.index][k] \
+                if tetrominoes[self.tetromino].states[state if state is not None else self.state][k] \
                         and grid[gi + i + gi_disp + 4][gj + j + gj_disp + 4]:
                     return True
         return False
@@ -74,11 +106,11 @@ class Piece:
             self.reset()
 
     def rotate(self):
-        next_index = self.index + 1
-        next_index %= len(tetrominoes[self.tetromino]['grid'])
-        if not self.isColliding(0, 0, next_index):
-            self.index += 1
-            self.index %= len(tetrominoes[self.tetromino]['grid'])
+        next_state = self.state + 1
+        next_state %= len(tetrominoes[self.tetromino].states)
+        if not self.isColliding(0, 0, next_state):
+            self.state += 1
+            self.state %= len(tetrominoes[self.tetromino].states)
 
     def move(self, dir):
         if dir == 'left' and self.canGo('left'):
@@ -96,8 +128,8 @@ class Piece:
         for i in range(4):
             for j in range(4):
                 k = (i * 4) + j
-                if tetrominoes[self.tetromino]['grid'][self.index][k]:
-                    grid[gi + i + 4][gj + j + 4] = tetrominoes[self.tetromino]['color']
+                if tetrominoes[self.tetromino].states[self.state][k]:
+                    grid[gi + i + 4][gj + j + 4] = tetrominoes[self.tetromino].color
         lookForRowClearing() 
         # look for game over
         for j in range(4, unit_width + 4):
@@ -108,8 +140,8 @@ def drawGrid():
     for i in range(unit_height + 8):
         for j in range(unit_width + 8):
             if grid[i][j] and grid[i][j] != -1:
-                pygame.draw.rect(screen, grid[i][j], (margin + ((j-4) * unit), \
-                                                          margin + ((i-4) * unit), unit, unit), 3)
+                pygame.draw.rect(screen, grid[i][j], 
+                                 (margin + ((j-4) * unit), margin + ((i-4) * unit), unit-2, unit-2), 3)
 
 def lookForRowClearing():
     i = unit_height - 1 + 4
@@ -131,6 +163,10 @@ screen = pygame.display.set_mode(size)
 pygame.time.set_timer(pygame.USEREVENT + 1, drop_speed)
 
 p = Piece()
+
+# grid[i][j] -> -1:     out of bound
+#                0:     empty
+#                color: used
 grid = [[0 for i in range(unit_width + 8)] for j in range(unit_height + 8)]
 for i in range(unit_height + 8):
     for j in range(unit_width + 8):
@@ -138,6 +174,8 @@ for i in range(unit_height + 8):
             grid[i][j] = -1
         elif j < 4 or j >= unit_width + 4:
             grid[i][j] = -1
+
+# Pygame event loop
         
 while True:
 
@@ -164,10 +202,11 @@ while True:
     screen.fill(pygame.color.Color('black'))
 
     # draw objects: the pit, the piece and the grid
-    pygame.draw.lines(screen, pygame.color.Color('grey'), False, \
-                          [(grid_left - 1, grid_top), (grid_left - 1, grid_top + grid_height + 1), \
-                               (grid_left + grid_width + 1, grid_top + grid_height + 1), \
-                               (grid_left + grid_width + 1, grid_top)], 1)
+    pygame.draw.lines(screen, pygame.color.Color('grey'), False, 
+                      [(grid_left - 3, grid_top), 
+                       (grid_left - 3, grid_top + grid_height), 
+                       (grid_left + grid_width, grid_top + grid_height), 
+                       (grid_left + grid_width, grid_top)], 1)
     p.draw()
     drawGrid()
     
